@@ -46,7 +46,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data.startswith("qty_"):
         quantity = int(query.data.split("_")[1])
-        total_price = quantity * 7
+        total_price = quantity * 9
         payment_url = await create_nowpayments_invoice(total_price)
 
         context.user_data['quantity'] = quantity
