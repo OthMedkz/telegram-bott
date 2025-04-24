@@ -13,7 +13,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 GOOGLE_JSON = os.getenv("GOOGLE_JSON")
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL")
 NOWPAYMENTS_API_KEY = os.getenv("NOWPAYMENTS_API_KEY")
-IPN_CALLBACK_URL = "https://telegram-bott-production.up.railway.app/ipn"  # Update with your generated domain
+IPN_CALLBACK_URL = "https://telegram-bott-production.up.railway.app/ipn"  # Your Railway domain
 
 # Load Google Sheets credentials
 creds_dict = json.loads(GOOGLE_JSON)
@@ -70,8 +70,8 @@ async def create_nowpayments_invoice(amount):
     }
     data = {
         "price_amount": amount,
-        "price_currency": "usd",         # Use "usd" to avoid USDT issues
-        "pay_currency": "usdttrc20",     # Specific network USDT
+        "price_currency": "usd",
+        "pay_currency": "usdttrc20",
         "order_description": "eBay Accounts",
         "ipn_callback_url": IPN_CALLBACK_URL
     }
@@ -86,7 +86,7 @@ async def create_nowpayments_invoice(amount):
             else:
                 raise Exception(f"NOWPayments error: {result}")
 
-# CONFIRM PAYMENT (manual backup, but won't be used with IPN)
+# CONFIRM PAYMENT (manual backup, not used with IPN)
 async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Please wait. Payments are automatically processed now.")
 
@@ -102,31 +102,31 @@ async def handle_webhook(request):
     pay_currency = data.get("pay_currency")
 
     if payment_status == "finished":
-        # Log payment info or update Google Sheets
         print(f"Payment {payment_id} confirmed for {pay_amount} {pay_currency} - {order_description}")
-        # Example: save to sheet
         sheet.append_row([payment_id, pay_amount, pay_currency, order_description, "Paid via IPN"])
 
     return web.Response(text="OK")
 
-# MAIN APP
+# MAIN APP - Run Telegram Bot and Webhook together
 async def main():
     telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
     telegram_app.add_handler(CommandHandler("start", start))
     telegram_app.add_handler(CallbackQueryHandler(button_handler))
     telegram_app.add_handler(CommandHandler("paid", confirm_payment))
 
-    # Webhook App
-    app_web = web.Application()
-    app_web.router.add_post('/ipn', handle_webhook)
-
-    runner = web.AppRunner(app_web)
+    runner = web.AppRunner(web.Application())
+    runner.app.router.add_post('/ipn', handle_webhook)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
 
     print("🚀 Bot and webhook are running...")
-    await telegram_app.run_polling()
+
+    # Run Telegram polling in background
+    telegram_task = asyncio.create_task(telegram_app.run_polling())
+
+    # Keep the webhook running
+    await telegram_task
 
 if __name__ == "__main__":
     asyncio.run(main())
