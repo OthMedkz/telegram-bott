@@ -6,6 +6,22 @@ import requests
 import gspread
 from google.oauth2.service_account import Credentials
 
+# DEBUGGING START
+print("Starting bot...")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+print("BOT_TOKEN:", BOT_TOKEN)
+print("Loading Google credentials...")
+
+try:
+    GOOGLE_JSON = os.getenv("GOOGLE_JSON")
+    creds_dict = json.loads(GOOGLE_JSON)
+    print("GOOGLE_JSON loaded successfully.")
+except Exception as e:
+    print("Failed to load GOOGLE_JSON:", str(e))
+    raise
+
+# DEBUGGING END
+
 # ENV VARIABLES
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GOOGLE_JSON = os.getenv("GOOGLE_JSON")
