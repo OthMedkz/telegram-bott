@@ -85,7 +85,7 @@ async def create_nowpayments_invoice(amount):
     data = {
         "price_amount": amount,
         "price_currency": "usdt",
-        "pay_currency": "usdt",
+        "pay_currency": "usdttrc20",  # or "usdterc20", "usdtbep20"
         "order_description": "eBay Accounts",
         "ipn_callback_url": "https://yourcallback.url/ipn"  # Use a real or placeholder URL
     }
