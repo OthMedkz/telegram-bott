@@ -75,9 +75,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # MOCK NOWPayments Invoice Function
-import aiohttp
-
 async def create_nowpayments_invoice(amount):
+    import aiohttp
+
     url = "https://api.nowpayments.io/v1/invoice"
     headers = {
         "x-api-key": NOWPAYMENTS_API_KEY,
@@ -86,16 +86,19 @@ async def create_nowpayments_invoice(amount):
     data = {
         "price_amount": amount,
         "price_currency": "usdt",
-        "pay_currency": "usdt",
-        "order_id": "order123",  # optional, you can customize it
-        "order_description": "eBay Kleinanzeigen Accounts Purchase",
-        "ipn_callback_url": "https://yourdomain.com/callback"  # optional
+        "pay_currency": "usdt"
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=data, headers=headers) as response:
+        async with session.post(url, headers=headers, json=data) as response:
             result = await response.json()
-            return result["invoice_url"]
+            print("NOWPayments API Response:", result)  # ADD THIS LINE
+
+            if "invoice_url" in result:
+                return result["invoice_url"]
+            else:
+                return "Error: Could not create invoice."
+
 
 
 # CONFIRM PAYMENT (Reply Handler)
