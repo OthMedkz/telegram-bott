@@ -6,7 +6,6 @@ from aiohttp import web
 from google.oauth2.service_account import Credentials
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
-import asyncio
 
 # ENV VARIABLES
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -86,10 +85,6 @@ async def create_nowpayments_invoice(amount):
             else:
                 raise Exception(f"NOWPayments error: {result}")
 
-# CONFIRM PAYMENT (manual backup, not used with IPN)
-async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Please wait. Payments are automatically processed now.")
-
 # Webhook handler for NOWPayments IPN
 async def handle_webhook(request):
     data = await request.json()
@@ -107,26 +102,24 @@ async def handle_webhook(request):
 
     return web.Response(text="OK")
 
-# MAIN APP - Run Telegram Bot and Webhook together
-async def main():
-    telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
-    telegram_app.add_handler(CommandHandler("start", start))
-    telegram_app.add_handler(CallbackQueryHandler(button_handler))
-    telegram_app.add_handler(CommandHandler("paid", confirm_payment))
+# Set up aiohttp webhook app
+web_app = web.Application()
+web_app.router.add_post('/ipn', handle_webhook)
 
-    runner = web.AppRunner(web.Application())
-    runner.app.router.add_post('/ipn', handle_webhook)
+# Telegram app setup
+telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
+telegram_app.add_handler(CommandHandler("start", start))
+telegram_app.add_handler(CallbackQueryHandler(button_handler))
+
+# Use post_init to start aiohttp AFTER bot is initialized
+async def post_init(app):
+    runner = web.AppRunner(web_app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
+    print("Webhook server running on port 8080...")
 
-    print("🚀 Bot and webhook are running...")
+telegram_app.post_init = post_init
 
-    # Run Telegram polling in background
-    telegram_task = asyncio.create_task(telegram_app.run_polling())
-
-    # Keep the webhook running
-    await telegram_task
-
-if __name__ == "__main__":
-    asyncio.run(main())
+print("🚀 Bot and webhook are running together...")
+telegram_app.run_polling()
