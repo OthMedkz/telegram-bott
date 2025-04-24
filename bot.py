@@ -5,6 +5,7 @@ import json
 import requests
 import gspread
 from google.oauth2.service_account import Credentials
+import aiohttp
 
 # DEBUGGING START
 print("Starting bot...")
@@ -76,8 +77,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # MOCK NOWPayments Invoice Function
 async def create_nowpayments_invoice(amount):
-    import aiohttp
-
     url = "https://api.nowpayments.io/v1/invoice"
     headers = {
         "x-api-key": NOWPAYMENTS_API_KEY,
@@ -86,18 +85,21 @@ async def create_nowpayments_invoice(amount):
     data = {
         "price_amount": amount,
         "price_currency": "usdt",
-        "pay_currency": "usdt"
+        "pay_currency": "usdt",
+        "order_description": "eBay Accounts",
+        "ipn_callback_url": "https://yourcallback.url/ipn"  # Use a real or placeholder URL
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, json=data) as response:
-            result = await response.json()
-            print("NOWPayments API Response:", result)  # ADD THIS LINE
+        async with session.post(url, headers=headers, json=data) as resp:
+            result = await resp.json()
+            print("NOWPayments API Response:", result)  # See full error
 
-            if "invoice_url" in result:
+            if resp.status == 200 and "invoice_url" in result:
                 return result["invoice_url"]
             else:
-                return "Error: Could not create invoice."
+                raise Exception(f"NOWPayments error: {result}")
+
 
 
 
