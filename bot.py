@@ -84,22 +84,21 @@ async def create_nowpayments_invoice(amount):
     }
     data = {
         "price_amount": amount,
-        "price_currency": "usdt",
-        "pay_currency": "usdttrc20",  # or "usdterc20", "usdtbep20"
+        "price_currency": "usd",         # Use "usd" or "eur" to avoid conversion issues
+        "pay_currency": "usdttrc20",     # Specific network USDT
         "order_description": "eBay Accounts",
-        "ipn_callback_url": "https://yourcallback.url/ipn"  # Use a real or placeholder URL
+        "ipn_callback_url": "https://example.com/ipn"  # Replace with your actual callback URL
     }
 
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, json=data) as resp:
             result = await resp.json()
-            print("NOWPayments API Response:", result)  # See full error
+            print("NOWPayments API Response:", result)
 
             if resp.status == 200 and "invoice_url" in result:
                 return result["invoice_url"]
             else:
                 raise Exception(f"NOWPayments error: {result}")
-
 
 
 
