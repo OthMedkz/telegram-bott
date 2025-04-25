@@ -7,6 +7,8 @@ from aiohttp import web
 import gspread
 from google.oauth2.service_account import Credentials
 import nest_asyncio
+import asyncio
+
 nest_asyncio.apply()
 
 # ENV VARIABLES
@@ -110,9 +112,8 @@ async def handle_webhook(request):
     payment_id = data.get("payment_id")
 
     if payment_status == "finished":
-        # Example: Send Telegram message or fulfill order
         print(f"Payment {payment_id} confirmed for {pay_amount} - {order_description}")
-        # TODO: Add logic to deliver account here
+        # TODO: Add logic to deliver account here (e.g., send Telegram message, update sheet)
 
     return web.Response(text="OK")
 
@@ -123,9 +124,6 @@ async def main():
     telegram_app.add_handler(CallbackQueryHandler(button_handler))
     telegram_app.add_handler(CommandHandler("paid", confirm_payment))
 
-    # Start Telegram bot polling
-    telegram_task = telegram_app.run_polling()
-
     # Start aiohttp webhook server
     app_web = web.Application()
     app_web.router.add_post('/ipn', handle_webhook)
@@ -135,8 +133,7 @@ async def main():
     await site.start()
     print("🚀 Bot and webhook server running...")
 
-    await telegram_task
+    await telegram_app.run_polling()
 
 # Run everything
-import asyncio
 asyncio.run(main())
