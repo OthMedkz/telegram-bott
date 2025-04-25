@@ -1,12 +1,14 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
 import json
 import gspread
-from google.oauth2.service_account import Credentials
 import aiohttp
-import asyncio
 from aiohttp import web
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+)
+from google.oauth2.service_account import Credentials
+import asyncio
 
 # ENV VARIABLES
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -47,61 +49,38 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data.startswith("qty_"):
         quantity = int(query.data.split("_")[1])
         total_price = quantity * 5
+        payment_url = await create_nowpayments_invoice(total_price, quantity)
+
         context.user_data['quantity'] = quantity
         context.user_data['price'] = total_price
-
-        if quantity == 1:
-            msg = (
-                f"💳 You selected {quantity} account.\n\n"
-                "💰 Total: 5 USDT\n\n"
-                "Available payment methods for 1 account:\n"
-                "LTC, DOGE, XRP, BNB (BEP20).\n\n"
-                "👇 Choose your payment method:"
-            )
-            coins = ["ltc", "doge", "xrp", "bnbbep20"]
-        else:
-            msg = (
-                f"💳 You selected {quantity} accounts.\n\n"
-                f"💰 Total: {total_price} USDT\n\n"
-                "Available payment methods:\n"
-                "USDT (TRC20), LTC, DOGE, XRP, BNB (BEP20).\n\n"
-                "👇 Choose your payment method:"
-            )
-            coins = ["usdttrc20", "ltc", "doge", "xrp", "bnbbep20"]
-
-        keyboard = [[InlineKeyboardButton(coin.upper(), callback_data=f"pay_{coin}")] for coin in coins]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(msg, reply_markup=reply_markup)
-
-    elif query.data.startswith("pay_"):
-        pay_currency = query.data.split("_")[1]
-        quantity = context.user_data['quantity']
-        total_price = context.user_data['price']
-
-        payment_url = await create_nowpayments_invoice(total_price, pay_currency)
-
         context.user_data['payment_url'] = payment_url
-        context.user_data['pay_currency'] = pay_currency
 
         await query.edit_message_text(
             f"💳 You selected {quantity} account(s).\n\n"
             f"💰 Total: {total_price} USD\n\n"
-            f"👉 Pay with {pay_currency.upper()} here: {payment_url}\n\n"
+            f"👉 Pay here: {payment_url}\n\n"
             f"After payment, reply with 'Paid' to confirm."
         )
 
-# NOWPayments Invoice Function
-async def create_nowpayments_invoice(amount, pay_currency):
+# CREATE NOWPayments Invoice
+async def create_nowpayments_invoice(amount, quantity):
     url = "https://api.nowpayments.io/v1/invoice"
     headers = {
         "x-api-key": NOWPAYMENTS_API_KEY,
         "Content-Type": "application/json"
     }
+
+    # Conditional currency logic
+    if quantity == 1:
+        pay_currency = "ltc"  # Let’s default to LTC for 1 account
+    else:
+        pay_currency = "usdttrc20"
+
     data = {
         "price_amount": amount,
-        "price_currency": "usd",
+        "price_currency": "usd",  # pricing base currency
         "pay_currency": pay_currency,
-        "order_description": "eBay Accounts",
+        "order_description": f"eBay Accounts x{quantity}",
         "ipn_callback_url": "https://telegram-bott-production.up.railway.app/ipn"
     }
 
@@ -115,20 +94,19 @@ async def create_nowpayments_invoice(amount, pay_currency):
             else:
                 raise Exception(f"NOWPayments error: {result}")
 
-# CONFIRM PAYMENT (Manual)
+# CONFIRM PAYMENT (manual for now)
 async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text.lower() == "paid":
         quantity = context.user_data.get('quantity')
         price = context.user_data.get('price')
         username = update.message.from_user.username
         payment_url = context.user_data.get('payment_url')
-        pay_currency = context.user_data.get('pay_currency')
 
-        sheet.append_row([username, quantity, price, pay_currency, payment_url, "Paid"])
+        sheet.append_row([username, quantity, price, payment_url, "Paid"])
 
         await update.message.reply_text("✅ Payment confirmed! Your accounts will be delivered shortly. Thank you!")
 
-# IPN HANDLER (Auto Payment Confirmation)
+# IPN Webhook handler
 async def handle_webhook(request):
     data = await request.json()
     print("Received IPN:", data)
@@ -140,29 +118,34 @@ async def handle_webhook(request):
 
     if payment_status == "finished":
         print(f"Payment {payment_id} confirmed for {pay_amount} - {order_description}")
-        # TODO: Auto send accounts or update sheet
+        # TODO: Add logic to fulfill order automatically
 
     return web.Response(text="OK")
 
-# MAIN APP
+# Start both Telegram bot and aiohttp web server
 async def main():
     telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
-
     telegram_app.add_handler(CommandHandler("start", start))
     telegram_app.add_handler(CallbackQueryHandler(button_handler))
     telegram_app.add_handler(CommandHandler("confirm", confirm_payment))
     telegram_app.add_handler(CommandHandler("paid", confirm_payment))
 
-    aiohttp_app = web.Application()
-    aiohttp_app.router.add_post('/ipn', handle_webhook)
+    # aiohttp app for webhook
+    app_web = web.Application()
+    app_web.router.add_post('/ipn', handle_webhook)
 
-    runner = web.AppRunner(aiohttp_app)
+    runner = web.AppRunner(app_web)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
 
-    print("🚀 Bot and webhook are running...")
-    await telegram_app.run_polling()
+    print("🚀 Bot and webhook server running...")
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    # Run Telegram bot without closing loop
+    await telegram_app.initialize()
+    await telegram_app.start()
+    await telegram_app.updater.start_polling()
+    await telegram_app.updater.idle()
+
+# Execute main
+asyncio.get_event_loop().run_until_complete(main())
