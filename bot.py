@@ -9,6 +9,7 @@ from telegram.ext import (
 )
 from google.oauth2.service_account import Credentials
 import asyncio
+import nest_asyncio
 
 # ENV VARIABLES
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -145,4 +146,5 @@ async def main():
 
 # Start everything
 if __name__ == "__main__":
-    asyncio.run(main())
+    nest_asyncio.apply()
+    asyncio.get_event_loop().run_until_complete(main())
