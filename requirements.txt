@@ -36,3 +36,4 @@ google-auth
 google-auth-oauthlib
 requests
 aiohttp
+nest_asyncio
