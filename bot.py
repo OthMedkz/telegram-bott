@@ -110,8 +110,9 @@ async def handle_webhook(request):
     payment_id = data.get("payment_id")
 
     if payment_status == "finished":
+        # Example: Send Telegram message or fulfill order
         print(f"Payment {payment_id} confirmed for {pay_amount} - {order_description}")
-        # Optional: update sheet or notify
+        # TODO: Add logic to deliver account here
 
     return web.Response(text="OK")
 
