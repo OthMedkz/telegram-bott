@@ -78,7 +78,7 @@ async def create_nowpayments_invoice(amount, quantity):
 
     data = {
         "price_amount": amount,
-        "price_currency": "usd",  # pricing base currency
+        "price_currency": "usd",
         "pay_currency": pay_currency,
         "order_description": f"eBay Accounts x{quantity}",
         "ipn_callback_url": "https://telegram-bott-production.up.railway.app/ipn"
@@ -122,7 +122,7 @@ async def handle_webhook(request):
 
     return web.Response(text="OK")
 
-# Start both Telegram bot and aiohttp web server
+# MAIN FUNCTION
 async def main():
     telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
     telegram_app.add_handler(CommandHandler("start", start))
@@ -141,11 +141,8 @@ async def main():
 
     print("🚀 Bot and webhook server running...")
 
-    # Run Telegram bot without closing loop
-    await telegram_app.initialize()
-    await telegram_app.start()
-    await telegram_app.updater.start_polling()
-    await telegram_app.updater.idle()
+    await telegram_app.run_polling()
 
-# Execute main
-asyncio.get_event_loop().run_until_complete(main())
+# Start everything
+if __name__ == "__main__":
+    asyncio.run(main())
