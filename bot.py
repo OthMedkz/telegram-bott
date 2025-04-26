@@ -103,8 +103,27 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Webhook handler for NOWPayments IPN
 async def handle_webhook(request):
-    data = await request.json()
-    print("Received IPN:", data)
+    headers = request.headers
+    received_sign = headers.get('x-nowpayments-sig')
+
+    if not received_sign:
+        print("No IPN signature received.")
+        return web.Response(status=400)
+
+    body = await request.text()
+    secret_key = os.getenv("IPN_SECRET")
+
+    # Validate signature
+    import hmac
+    import hashlib
+    calculated_sign = hmac.new(secret_key.encode(), body.encode(), hashlib.sha512).hexdigest()
+
+    if calculated_sign != received_sign:
+        print("Invalid IPN signature.")
+        return web.Response(status=400)
+
+    data = json.loads(body)
+    print("Valid IPN:", data)
 
     payment_status = data.get("payment_status")
     pay_amount = data.get("price_amount")
@@ -112,8 +131,8 @@ async def handle_webhook(request):
     payment_id = data.get("payment_id")
 
     if payment_status == "finished":
-        print(f"Payment {payment_id} confirmed for {pay_amount} - {order_description}")
-        # TODO: Add logic to deliver account here (e.g., send Telegram message, update sheet)
+        print(f"✅ Payment {payment_id} confirmed for {pay_amount} - {order_description}")
+        # TODO: Add logic to deliver account here
 
     return web.Response(text="OK")
 
